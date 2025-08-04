@@ -1,8 +1,8 @@
 
 import statistics as st
-from order import Order 
 import math
-from curve_fitting import fit_distribution
+from .curve_fitting import fit_distribution
+from .order import Order 
 
 
 class Warehouse_SKU:

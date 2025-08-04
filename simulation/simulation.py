@@ -1,12 +1,12 @@
 import numpy as np
 import statistics as st
 from datetime import datetime, date, time, timedelta
-from warehouse import Warehouse
-from order import Order, Shipment
 import matplotlib.pyplot as plt
-from OCEL_FormatGenerator import generate_ocel_event_log, adjust_to_weekday
 import pm4py as pm 
 import time
+from .warehouse import Warehouse
+from .order import Order, Shipment
+from .OCEL_FormatGenerator import generate_ocel_event_log, adjust_to_weekday
 
 class Simulation:
     def __init__(
