@@ -15,7 +15,7 @@
 
   - [x] interface for simulation results
   - [x] interface for simulation inputs
-  - [] add split config
+  - [x] add split config
   - [] log import/export
   - [] configurable KPIs
   - [] interface for process mining inputs

@@ -11,3 +11,4 @@ OCEL.json
 *.svg
 theory*
 OrderProcess*
+.venv/**
