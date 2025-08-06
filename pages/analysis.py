@@ -12,7 +12,10 @@ dash.register_page(__name__, path="/analysis")
 
 layout = dbc.Container([
     html.H4("Explore OCEL"),
-    dbc.Button("Show OCEL Table", id='show-ocel-button', color='secondary'),
+    dbc.Button("Show OCEL Table & Stats", id='show-ocel-button', color='secondary'),
+    html.Hr(),
     html.Div(id="ocel-table-container"),
+    html.Div(id="ocel-stats-container"),
+    html.Div(id="pm-variant-plot"),
     dcc.Store(id="stored-ocel", storage_type="session")
 ])
