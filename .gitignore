@@ -11,3 +11,6 @@ OCEL.json
 *.svg
 theory*
 OrderProcess*
+.venv/**
+*.json
+*/__pycache__/*
