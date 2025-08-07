@@ -1,3 +1,5 @@
+import hashlib
+
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -16,6 +18,15 @@ def convert_int64_to_int(obj):
         return int(obj)
     return obj
 
+def save_json(data, file_path, convert_int64=True):
+    """
+    Save data as JSON. Optionally convert np.int64 to int.
+    """
+    if convert_int64:
+        data = convert_int64_to_int(data)
+    with open(file_path, "w") as f:
+        json.dump(data, f, indent=4)
+
 
 def save_dataframe_to_csv(df: pd.DataFrame, filename, directory):
     # Create the directory if it doesn't exist
@@ -29,10 +40,7 @@ def save_dataframe_to_csv(df: pd.DataFrame, filename, directory):
 
 
 # Function to save the OCEL log in JSON format
-def save_ocel_log_to_json(ocel_log, start_date,output, verbose=False):
-    # Convert any np.int64 values to regular Python int
-    ocel_log = convert_int64_to_int(ocel_log)
-
+def save_ocel_log_to_json(ocel_log, start_date, output, verbose=False):
     # Create the Output directory if it does not exist
     if not os.path.exists(output):
         os.makedirs(output)
@@ -64,6 +72,55 @@ def generate_unique_id(obj_type,iteration, material_item_id):
             used_ids[obj_type].add(obj_id)
             return obj_id
 
+def generate_package_id_by_date(delivery_date):
+    """
+    Generates a deterministic, pseudo-random package ID string for a given delivery date (YYYY-MM-DD).
+    This guarantees that all packages on the same day share the same ID, and
+    no two packages on different dates can have the same ID.
+    """
+    date_str = delivery_date.strftime('%Y-%m-%d')  # or isoformat()
+    # Hash the date string (SHA256), take the first N characters
+    h = hashlib.sha256(date_str.encode('utf-8')).hexdigest()
+    # Return a compact ID, e.g., first 8 hex digits
+    return f"package_{date_str}_{h[:8]}"
+
+def get_batch_resource(event_date, event_type, resource_list):
+    """
+    Deterministically selects a resource from a list for a given event type and date.
+    All events of the same type on the same date will use the same resource.
+    """
+    seed = int.from_bytes((event_date.strftime('%Y-%m-%d') + event_type).encode(), 'little')
+    rng = np.random.default_rng(seed)
+    return rng.choice(resource_list)
+
+def deterministic_event_time(
+    base_time: datetime,
+    event_type: str,
+    min_offset_min: int,
+    max_offset_min: int,
+    date_for_seed: datetime = None,
+    extra_noise_min: int = 0,  # e.g. 10 for ±10 min variation
+) -> datetime:
+    """
+    Generates a deterministic, reproducible timestamp for an event, guaranteed to be after base_time,
+    with optional non-deterministic light extra noise (for more realism).
+
+    extra_noise_min: Maximum magnitude (±X min) of additional random offset not tied to date.
+    global_rng: Optional np.random.Generator for run-specific noise. If None, uses np.random.default_rng().
+    """
+    # Deterministic seed component (day + event)
+    seed_date = date_for_seed.date() if date_for_seed else base_time.date()
+    seed = int.from_bytes((seed_date.strftime('%Y-%m-%d') + event_type).encode(), 'little')
+    rng = np.random.default_rng(seed)
+    offset_min = int(rng.integers(min_offset_min, max_offset_min + 1))
+
+    # Slight additional fluctuation (not dependent on the day)
+    noise = 0
+    if extra_noise_min > 0:
+        noise = int(np.random.default_rng().integers(0, extra_noise_min + 1))
+
+    return base_time + timedelta(minutes=offset_min + noise)
+
 # Helper function to generate random timedelta in a realistic working day range
 def generate_random_timedelta(min_days, max_days, min_hours=8, max_hours=17, verbose=False):
     """
@@ -76,25 +133,24 @@ def generate_random_timedelta(min_days, max_days, min_hours=8, max_hours=17, ver
     return timedelta(days=days, hours=hours, minutes=minutes)
 
 
-# Function to adjust the date to avoid weekends
-def adjust_to_weekday(date):
-    # If the date is a Saturday (5) or Sunday (6), shift to Monday
-    while date.weekday() >= 5:
-        date += timedelta(days=1)
-    return date
-
-
-# Helper function to adjust time to working hours (08:00 - 17:00) and weekdays
 def adjust_to_working_hours(timestamp):
-    # Adjust to the nearest working day if it's a weekend
-    timestamp = adjust_to_weekday(timestamp)
+    """
+    Adjust a timestamp to the nearest weekday and working hours (08:00 to 17:00).
+    If the timestamp falls on a weekend, shift to Monday.
+    If the time is outside working hours, shift accordingly.
+    """
+    # Shift to Monday if it's Saturday or Sunday
+    while timestamp.weekday() >= 5:
+        timestamp += timedelta(days=1)
 
-    # Adjust the time if it's outside of working hours (08:00 to 17:00)
+    # Adjust time to working hours
     if timestamp.hour < 8:
         timestamp = timestamp.replace(hour=8, minute=np.random.randint(0, 59))
     elif timestamp.hour >= 17:
-        # Move the timestamp to the next working day at a random time between 08:00 and 17:00
+        # Move to next working day at 8 AM
         timestamp += timedelta(days=1)
+        while timestamp.weekday() >= 5:
+            timestamp += timedelta(days=1)
         timestamp = timestamp.replace(hour=8, minute=np.random.randint(0, 59))
 
     return timestamp
@@ -194,6 +250,8 @@ def distribute_values(func, time_slots, target_sum, verbose=False):
 
 # Function to generate OCEL event log
 def generate_ocel_event_log(start_date, items, iteration, output, company="company_1", verbose=False):
+
+    global_rng = np.random.default_rng()
 
     object_types = [
         {
@@ -351,7 +409,7 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
             items[key]['amount'])
 
     # Adjust start date to ensure it's a weekday
-    start_date = adjust_to_weekday(start_date)
+    start_date = adjust_to_working_hours(start_date)
 
     # Generate timestamps for each event based on the start date
     place_order_timestamp = start_date
@@ -494,18 +552,39 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
         check_availability_timestamp = adjust_to_working_hours(check_availability_timestamp)
 
         # Add the "Split Item" event (1 day after Check Availability)
-        split_item_timestamp = check_availability_timestamp + timedelta(days=1)
+        split_day = check_availability_timestamp + timedelta(days=1)
+        split_base_time = datetime.combine(split_day, datetime.min.time()) + timedelta(hours=7)
+
+        split_item_timestamp = deterministic_event_time(
+            base_time=split_base_time,
+            event_type='Split Item',
+            min_offset_min=-60,
+            max_offset_min=60,
+            date_for_seed=split_day,
+            extra_noise_min=0  # Optional: ±10 min per call random noise
+        )
 
         # Update the last timestamp for future events
         last_check_timestamp = check_availability_timestamp
 
-        pick_item_timestamp = split_item_timestamp + timedelta(
-            minutes=np.random.randint(15, 180))  # 15 mins to 3 hours
-        pick_item_timestamp = adjust_to_working_hours(pick_item_timestamp)
+        pick_item_timestamp = deterministic_event_time(
+            base_time=split_item_timestamp,
+            event_type='Pick Item',
+            min_offset_min=15,
+            max_offset_min=60,
+            date_for_seed=split_day,
+            extra_noise_min=5
+        )
 
         # After Pick Item, execute the "Pack Items" activity
-        pack_items_timestamp = pick_item_timestamp + timedelta(minutes=np.random.randint(17, 60))  # 5 minutes to 1 hour
-        pack_items_timestamp = adjust_to_working_hours(pack_items_timestamp)
+        pack_items_timestamp = deterministic_event_time(
+            base_time=pick_item_timestamp,
+            event_type='Pack Items',
+            min_offset_min=17,
+            max_offset_min=30,
+            date_for_seed=split_day,
+            extra_noise_min=8
+        )
 
 
 
@@ -513,7 +592,7 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
             if(day < items[key]['del_days']):
 
                 item_check_availability_timestamp = check_availability_timestamp + timedelta(
-            minutes=np.random.randint(1, 20))
+            minutes=np.random.randint(1, 10))
 
                 # New entry for traditional process mining
                 check_entry = {
@@ -825,7 +904,7 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
                     if verbose:
                         print(f"Pick Item activity for {items[key]['last_item_id']} after Check Availability at {item_pick_item_timestamp}")
 
-        package_id = generate_unique_id("package", iteration, 'p')
+        package_id = generate_package_id_by_date(pack_items_timestamp)
         package_object = {
             "id": package_id,
             "type": "Package",
@@ -904,8 +983,14 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
             print(f"Pack Items activity for {relationships} with package {package_id} at {pack_items_timestamp}")
 
         # After Pack Items, execute the "Store Package" activity
-        store_package_timestamp = pack_items_timestamp + timedelta(minutes=np.random.randint(5, 20))  # 5 to 20 minutes
-        store_package_timestamp = adjust_to_working_hours(store_package_timestamp)
+        store_package_timestamp = deterministic_event_time(
+            base_time=pack_items_timestamp,
+            event_type='Store Package',
+            min_offset_min=5,
+            max_offset_min=20,
+            date_for_seed=split_day,
+            extra_noise_min=3
+        )
 
         for key, item in items.items():
             if day < item['del_days']:
@@ -953,9 +1038,14 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
             print(f"Store Package activity for {package_id} at {store_package_timestamp}")
 
         # After Store Package, execute the "Load Package" activity
-        load_package_timestamp = store_package_timestamp + timedelta(
-            minutes=np.random.randint(20, 360))  # 20 minutes to 6 hours
-        load_package_timestamp = adjust_to_working_hours(load_package_timestamp)
+        load_package_timestamp = deterministic_event_time(
+            base_time=store_package_timestamp,
+            event_type='Load Package',
+            min_offset_min=30,
+            max_offset_min=180,
+            date_for_seed=split_day,
+            extra_noise_min=20
+        )
 
         for key, item in items.items():
             if day < item['del_days']:
@@ -1002,8 +1092,19 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
         if verbose:
             print(f"Load Package activity for {package_id} at {load_package_timestamp}")
 
-        # After Load Package, execute the "Deliver Package" activity
-        deliver_package_timestamp = load_package_timestamp + timedelta(days=np.random.randint(3, 6))  # 3 to 6 days
+        # Determine a realistic delivery timestamp 3–5 days after loading
+        deliver_package_timestamp = load_package_timestamp + timedelta(days=np.random.randint(3, 6))
+
+        # Add a reproducible pseudo-random variation around noon (±4 hours) to simulate realistic delivery times.
+        # The randomness is seeded by the delivery date to ensure temporal determinism across simulation runs.
+        day_seed = int.from_bytes(deliver_package_timestamp.date().isoformat().encode(), 'little')
+        rng = np.random.default_rng(day_seed)
+        offset_minutes = int(rng.integers(-240, 241))  # ±4 hours = ±240 minutes
+
+        # Set base time to 12:00 noon on delivery day and apply offset
+        deliver_package_timestamp = datetime.combine(
+            deliver_package_timestamp.date(), datetime.min.time()
+        ) + timedelta(hours=12) + timedelta(minutes=offset_minutes)
 
         for key, item in items.items():
             if day < item['del_days']:
@@ -1058,7 +1159,7 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
     }
 
     # Save the OCEL log as a JSON file
-    save_ocel_log_to_json(ocel_log, start_date,output,verbose,)
+    save_ocel_log_to_json(ocel_log, start_date, output, verbose, )
 
     save_dataframe_to_csv(divergence_event_log_items, f"OrderProcess_{start_date}_div_items.csv", f'{output}/div_items')
 
@@ -1070,23 +1171,23 @@ def generate_ocel_event_log(start_date, items, iteration, output, company="compa
 
 
 # Example usage of the function
-# start_date = datetime(2025, 4, 7, 8, 0, 0)  # Example start date (Monday, 8 AM)
-# amount = [800, 500, 20]  # Example amount for the order
-# func = [lambda x: np.exp(2 * x), lambda x: 2, lambda x: x ** 2]  # Example function for distributing the amount over time
-# del_days = [2, 3, 4]  # Test with 10 days
-# items = {}
+start_date = datetime(2025, 4, 7, 8, 0, 0)  # Example start date (Monday, 8 AM)
+amount = [800, 500, 20]  # Example amount for the order
+func = [lambda x: np.exp(2 * x), lambda x: 2, lambda x: x ** 2]  # Example function for distributing the amount over time
+del_days = [2, 3, 4]  # Test with 10 days
+items = {}
 
-# for i in range(len(amount)):
-#     items[i] = {
-#         'amount': amount[i],
-#         'func': func[i](del_days[i]),
-#         'del_days': del_days[i]
-#     }
+for i in range(len(amount)):
+    items[i] = {
+        'amount': amount[i],
+        'func': func[i](del_days[i]),
+        'del_days': del_days[i]
+    }
 
 
 
 # Generate the OCEL event log
-#ocel_event_log = generate_ocel_event_log(start_date, items, 1)
+# ocel_event_log = generate_ocel_event_log(start_date, items, 1)
 
 # # Set pandas options to display all rows and columns
 # pd.set_option('display.max_rows', None)  # Display all rows

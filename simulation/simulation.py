@@ -6,7 +6,7 @@ import pm4py as pm
 import time
 from .warehouse import Warehouse
 from .order import Order, Shipment
-from .OCEL_FormatGenerator import generate_ocel_event_log, adjust_to_weekday
+from .OCEL_FormatGenerator import generate_ocel_event_log, adjust_to_working_hours
 
 class Simulation:
     def __init__(
@@ -52,7 +52,7 @@ class Simulation:
             ocel_config[sku_id] = {'amount': sku.quantity, 'del_days': delivery_days, 'func':  self.delivery_func[sku_id]}
         generate_ocel_event_log(start_date=self.current_date, items=ocel_config, iteration=order.id, output=self.output)
         
-        date_str = adjust_to_weekday(self.current_date).strftime("%Y-%m-%d")
+        date_str = adjust_to_working_hours(self.current_date).strftime("%Y-%m-%d")
         ocel = pm.read_ocel2_json(f"{self.output}/OrderProcess_{date_str}.json")
         filtered_ocel = pm.filter_ocel_event_attribute(ocel,'ocel:activity',['Deliver Package'])
 

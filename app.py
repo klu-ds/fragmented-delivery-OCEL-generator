@@ -1,3 +1,4 @@
+import numpy as np
 from dash import Dash, html, dcc, Input, Output, State, dash_table
 from datetime import datetime
 import dash_bootstrap_components as dbc
@@ -136,8 +137,8 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
         'mean_daily_demand': mean_demand,
         'std_daily_demand': std_demand,
         'delivery_func': [delivery_func, delivery_func],
-        'delivery_split_centre': 0,
-        'delivery_split_std': 1,
+        'delivery_split_centre': 5,
+        'delivery_split_std': 6,
         'output': output_label
     }
 
