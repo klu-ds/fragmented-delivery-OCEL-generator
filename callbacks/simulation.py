@@ -1,6 +1,6 @@
 from dash import Input, Output, State, callback, html
 from datetime import datetime
-import os
+import os, shutil
 import json
 import pm4py
 from simulation.warehouse import Warehouse
@@ -31,6 +31,12 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
     if not n_clicks:
         return ""
 
+    #clear output
+    try:
+        shutil.rmtree(output_label)
+    except OSError as e:
+        print("Error: %s - %s." % (e.filename, e.strerror))
+    os.makedirs(output_label)
     # Select function from label
     delivery_func = delivery_functions[delivery_func_label]
 
@@ -66,11 +72,11 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
         'start_date': datetime.fromisoformat(start_date),
         'days': days,
         'seed': seed,
-        'mean_daily_demand': mean_split,
-        'std_daily_demand': std_split,
+        'mean_daily_demand': mean_demand,
+        'std_daily_demand': std_demand,
         'delivery_func': [delivery_func, delivery_func],
-        'delivery_split_centre': 0,
-        'delivery_split_std': 1,
+        'delivery_split_centre': mean_split,
+        'delivery_split_std': std_split,
         'output': output_label
     }
 
@@ -87,7 +93,7 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
             html.P(f"service level: {simulation.results['service_level']:.2f}"),
             #html.P(f"Item Completion: {kpis['item_completion']:.2f}"),
         ]),
-        get_ocel('experiment/')
+        get_ocel(f'{output_label}/')
     )
 
 def get_ocel(path):
