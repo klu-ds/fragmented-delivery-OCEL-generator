@@ -7,6 +7,8 @@ import json
 import os
 import pm4py
 import callbacks
+import dash_cytoscape as cyto
+
 
 dash.register_page(__name__, path="/analysis")
 
@@ -16,6 +18,7 @@ layout = dbc.Container([
     html.Hr(),
     html.Div(id="ocel-table-container"),
     html.Div(id="ocel-stats-container"),
-    html.Div(id="pm-variant-plot"),
+    dbc.Button("Show OCEL Network", id="show-ocel-network", color='primary'),
+    html.Div(id="ocel-network-container"),
     dcc.Store(id="stored-ocel", storage_type="session")
 ])
