@@ -22,6 +22,7 @@ app.layout = dbc.Container([
     ),
     html.Hr(),
     dcc.Store(id="stored-ocel", storage_type="session"),
+    dcc.Store(id="stored-sku-configs", storage_type="session"),
     page_container
 ], fluid=True)
 

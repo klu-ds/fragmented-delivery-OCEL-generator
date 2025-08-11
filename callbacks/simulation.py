@@ -1,5 +1,6 @@
-from dash import Input, Output, State, callback, html
+from dash import Input, Output, State, callback, html,  MATCH, ALL, ctx, callback_context
 from datetime import datetime
+import dash_bootstrap_components as dbc
 import os, shutil
 import json
 import pm4py
@@ -11,11 +12,163 @@ delivery_functions = {
     'quadratic': lambda x: x**2,
     'logarithmic': lambda x: -np.log(x)
 }
+from dash.exceptions import PreventUpdate
+@callback(
+    Output("stored-sku-configs", "data"),
+    Input("add-sku-button", "n_clicks"),
+    Input({"type": "sku-delete", "index": ALL}, "n_clicks"),
+    Input({"type": "sku-rop", "index": ALL}, "value"),
+    Input({"type": "sku-eoq", "index": ALL}, "value"),
+    Input({"type": "sku-order-cost", "index": ALL}, "value"),
+    Input({"type": "sku-inventory", "index": ALL}, "value"),
+    Input({"type": "sku-delivery-func", "index": ALL}, "value"),
+    State("stored-sku-configs", "data"),
+    prevent_initial_call=True
+)
+def manage_skus(
+    add_clicks,
+    delete_clicks,
+    rop_values,
+    eoq_values,
+    order_cost_values,
+    inventory_values,
+    delivery_func_values,
+    sku_list
+):
+    if sku_list is None:
+        sku_list = []
+
+    triggered = ctx.triggered_id
+
+    # Handle add SKU
+    if triggered == "add-sku-button":
+        new_id = max([sku['id'] for sku in sku_list], default=-1) + 1
+        new_sku = {
+            "id": new_id,
+            "rop": 500,
+            "eoq": 0,
+            "z_score": 1.65,
+            "order_base_cost": 50,
+            "holding_cost": 1,
+            "inventory": 500,
+            "delivery_func": "constant",
+            "kpi": "order_completion",
+            "verbose": True
+        }
+        sku_list.append(new_sku)
+        return sku_list
+
+    # Handle delete SKU
+    elif isinstance(triggered, dict) and triggered.get('type') == 'sku-delete':
+        delete_id = triggered.get('index')
+        sku_list = [sku for sku in sku_list if sku['id'] != delete_id]
+        return sku_list
+
+    else:
+        for i, sku in enumerate(sku_list):
+            if i < len(rop_values):
+                sku['rop'] = rop_values[i]
+            if i < len(eoq_values):
+                sku['eoq'] = eoq_values[i]
+            if i < len(order_cost_values):
+                sku['order_base_cost'] = order_cost_values[i]
+            if i < len(inventory_values):
+                sku['inventory'] = inventory_values[i]
+            if i < len(delivery_func_values):
+                sku['delivery_func'] = delivery_func_values[i]
+        for sku in sku_list:
+            print(sku)
+        return sku_list
+
+    raise PreventUpdate
+
+@callback(
+    Output("sku-config-container", "children"),
+    Input("stored-sku-configs", "data")
+)
+def render_sku_inputs(sku_list):
+    if not sku_list:
+        return html.Div("No SKUs configured yet.")
+    return [render_sku_card(sku) for sku in sku_list]
+
+def render_sku_card(sku):
+    return dbc.Card(
+        dbc.CardBody([
+            # Card header row with title and delete button
+            dbc.Row([
+                dbc.Col(html.H6(f"SKU {sku['id']}", className="card-title"), width=10),
+                dbc.Col(
+                    dbc.Button(
+                        "×",
+                        id={"type": "sku-delete", "index": sku["id"]},
+                        color="danger",
+                        size="sm",
+                        className="float-end"
+                    ),
+                    width=2
+                )
+            ], align="center"),
+
+            # SKU parameter inputs
+            dbc.Row([
+                dbc.Col([
+                    dbc.Label("ROP"),
+                    dbc.Input(
+                        id={"type": "sku-rop", "index": sku["id"]},
+                        type="number",
+                        value=sku["rop"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("EOQ"),
+                    dbc.Input(
+                        id={"type": "sku-eoq", "index": sku["id"]},
+                        type="number",
+                        value=sku["eoq"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Order Cost"),
+                    dbc.Input(
+                        id={"type": "sku-order-cost", "index": sku["id"]},
+                        type="number",
+                        value=sku["order_base_cost"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Inventory"),
+                    dbc.Input(
+                        id={"type": "sku-inventory", "index": sku["id"]},
+                        type="number",
+                        value=sku["inventory"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Delivery Function"),
+                    dbc.Select(
+                        id={"type": "sku-delivery-func", "index": sku["id"]},
+                        options=[
+                            {"label": "Constant", "value": "constant"},
+                            {"label": "Quadratic", "value": "quadratic"},
+                            {"label": "Logarithmic", "value": "logarithmic"}
+                        ],
+                        value=sku["delivery_func"]
+                    )
+                ], width=4)
+            ], className="g-2 mt-2")
+        ]),
+        className="mb-3 shadow-sm"
+    )
 
 @callback(
     Output('simulation-output', 'children'),
     Output('stored-ocel', 'data'),
     Input('run-button', 'n_clicks'),
+    State('stored-sku-configs', 'data'),
     State('start-date', 'date'),
     State('sim-days', 'value'),
     State('seed', 'value'),
@@ -26,9 +179,10 @@ delivery_functions = {
     State('output-label', 'value'),
     prevent_initial_call=True
 )
-def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, mean_split, std_split, output_label):
+def run_simulation(n_clicks, sku_configs, start_date, days, seed, mean_demand, std_demand, mean_split, std_split, output_label):
     if not n_clicks:
         return ""
+
 
     #clear output
     try:
@@ -36,35 +190,16 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, me
     except OSError as e:
         print("Error: %s - %s." % (e.filename, e.strerror))
     os.makedirs(output_label)
-    # Select function from label
+   
+    if not sku_configs:
+        return html.P("No SKU configs provided."), None
 
-    sku_config_0 = {
-        'id' : 0,
-        'rop' : 500,
-        'eoq' : 0,
-        'z_score': 1.65,
-        'order_base_cost' : 60,
-        'holding_cost' : 1 , 
-        'inventory' : 500,
-        'delivery_func' : delivery_functions['constant'],
-        'kpi' : 'order_completion',
-        'verbose': True
-    }
+    # Map string delivery funcs to actual lambdas
+    for sku in sku_configs:
+        print(sku)
+        sku["delivery_func"] = delivery_functions[sku["delivery_func"]]
 
-    sku_config_1 = {
-        'id' : 1,
-        'rop' : 300,
-        'eoq' : 0,
-        'z_score': 1.65,
-        'order_base_cost' : 30,
-        'holding_cost' : 1 , 
-        'inventory' : 500,
-        'delivery_func' : delivery_functions['constant'],
-        'kpi' : 'order_completion',
-        'verbose': True
-    }
-
-    warehouse = Warehouse([sku_config_0,sku_config_1])
+    warehouse = Warehouse(sku_configs)
 
     # Build config
     sim_config = {
