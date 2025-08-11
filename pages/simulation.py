@@ -8,12 +8,6 @@ import pm4py
 import callbacks
 from simulation import warehouse, simulation
 
-delivery_functions = {
-    '1 (constant)': lambda x: 1,
-    'x^2': lambda x: x**2,
-    '-log(x)': lambda x: -np.log(x)
-}
-
 register_page(__name__, path="/")
 
 
@@ -47,14 +41,6 @@ layout = dbc.Container([
         dbc.Col([
             dbc.Label("Std Daily Demand"),
             dbc.Input(id='std-demand', type='number', value=1)
-        ]),
-        dbc.Col([
-            dbc.Label("Delivery Function"),
-            dcc.Dropdown(
-                id='delivery-func',
-                options=[{'label': k, 'value': k} for k in delivery_functions.keys()],
-                value='1 (constant)'
-            )
         ]),
     ], className="mb-3"),
     dbc.Row([

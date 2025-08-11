@@ -7,9 +7,9 @@ from simulation.warehouse import Warehouse
 from simulation.simulation import Simulation
 
 delivery_functions = {
-    '1 (constant)': lambda x: 1,
-    'x^2': lambda x: x**2,
-    '-log(x)': lambda x: -np.log(x)
+    'constant': lambda x: 1,
+    'quadratic': lambda x: x**2,
+    'logarithmic': lambda x: -np.log(x)
 }
 
 @callback(
@@ -21,13 +21,12 @@ delivery_functions = {
     State('seed', 'value'),
     State('mean-demand', 'value'),
     State('std-demand', 'value'),
-    State('delivery-func', 'value'),
     State('mean-split', 'value'),
     State('std-split', 'value'),
     State('output-label', 'value'),
     prevent_initial_call=True
 )
-def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, delivery_func_label, mean_split, std_split, output_label):
+def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, mean_split, std_split, output_label):
     if not n_clicks:
         return ""
 
@@ -38,7 +37,6 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
         print("Error: %s - %s." % (e.filename, e.strerror))
     os.makedirs(output_label)
     # Select function from label
-    delivery_func = delivery_functions[delivery_func_label]
 
     sku_config_0 = {
         'id' : 0,
@@ -48,6 +46,7 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
         'order_base_cost' : 60,
         'holding_cost' : 1 , 
         'inventory' : 500,
+        'delivery_func' : delivery_functions['constant'],
         'kpi' : 'order_completion',
         'verbose': True
     }
@@ -60,6 +59,7 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
         'order_base_cost' : 30,
         'holding_cost' : 1 , 
         'inventory' : 500,
+        'delivery_func' : delivery_functions['constant'],
         'kpi' : 'order_completion',
         'verbose': True
     }
@@ -74,7 +74,6 @@ def run_simulation(n_clicks, start_date, days, seed, mean_demand, std_demand, de
         'seed': seed,
         'mean_daily_demand': mean_demand,
         'std_daily_demand': std_demand,
-        'delivery_func': [delivery_func, delivery_func],
         'delivery_split_centre': mean_split,
         'delivery_split_std': std_split,
         'output': output_label

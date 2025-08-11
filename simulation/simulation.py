@@ -11,7 +11,7 @@ from .OCEL_FormatGenerator import generate_ocel_event_log, adjust_to_working_hou
 class Simulation:
     def __init__(
         self, config:dict ):
-        keys= ['start_date', 'days', 'warehouse', 'seed', 'mean_daily_demand','std_daily_demand','delivery_func', 'delivery_split_centre', 'delivery_split_std', 'output','verbose']
+        keys= ['start_date', 'days', 'warehouse', 'seed', 'mean_daily_demand','std_daily_demand', 'delivery_split_centre', 'delivery_split_std', 'output','verbose']
         for key in keys:
             setattr(self, key, config.get(key))
         
@@ -49,7 +49,7 @@ class Simulation:
         ocel_config = {}
         for sku_id, sku in order.SKUs.items():
             delivery_days = max(1, int(np.random.normal(self.delivery_split_centre, self.delivery_split_std)))
-            ocel_config[sku_id] = {'amount': sku.quantity, 'del_days': delivery_days, 'func':  self.delivery_func[sku_id]}
+            ocel_config[sku_id] = {'amount': sku.quantity, 'del_days': delivery_days, 'func':  sku.delivery_func}
         generate_ocel_event_log(start_date=self.current_date, items=ocel_config, iteration=order.id, output=self.output)
         
         date_str = adjust_to_working_hours(self.current_date).strftime("%Y-%m-%d")

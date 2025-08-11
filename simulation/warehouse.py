@@ -8,7 +8,7 @@ from .order import Order
 class Warehouse_SKU:
     def __init__(self, config:dict ):
         
-        keys={'id','rop', 'eoq','z_score', 'order_base_cost', 'holding_cost', 'inventory', 'kpi', 'verbose' }
+        keys={'id','rop', 'eoq','z_score', 'order_base_cost', 'holding_cost', 'inventory', 'kpi', 'delivery_func', 'verbose' }
         # z-score based on idea that lead times are normal distributed
         for key in keys:
             setattr(self, key, config.get(key))
