@@ -132,7 +132,7 @@ class Simulation:
 
     def evaluate_globally(self,report=False):
         # --- Results ---
-        self.results = {
+        results = {
             'service_level' : self.global_fulfilled_demand / self.total_demand,
             'total_demand' : self.total_demand,
             'fulfilled_demand' : self.global_fulfilled_demand,
@@ -145,13 +145,13 @@ class Simulation:
             # 'mean_order_size' : st.mean(self.warehouse.order_sizes)
         }
         if report == True:
-            for key, value in self.results.items():
+            for key, value in results.items():
                 print(f"{key}: {value}")
-
-        return self.results
+        self.results = results
+        return results
     
     def evaluate_skus(self, sku, report=False):
-        self.sku_results[sku] = {
+        sku_results = {
             'service_level' : self.warehouse.SKUs[sku].fulfilled_demand / self.warehouse.SKUs[sku].total_demand,
             'total_demand' : self.warehouse.SKUs[sku].total_demand,
             'fulfilled_demand' : self.warehouse.SKUs[sku].fulfilled_demand,
@@ -163,10 +163,12 @@ class Simulation:
             # 'mean_order_size' : st.mean(self.warehouse.order_sizes)
         }
         if report == True:
-            for key, value in self.sku_results[sku].items():
+            for key, value in sku_results.items():
                 print(f"{key}: {value}")
+        self.sku_results[sku] = sku_results
+        return sku_results
 
-        return self.results
+
     def visualize(self):
         # --- Visualization ---
         plt.figure(figsize=(12, 6))

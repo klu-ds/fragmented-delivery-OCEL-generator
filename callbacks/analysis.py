@@ -1,43 +1,75 @@
-
-# from dash import Input, Output, callback, html, State
-# from dash import dash_table
-# import pandas as pd
-
-# @callback(
-#     Output('ocel-table-container', 'children'),
-#     Input('show-ocel-button', 'n_clicks'),
-#     State('stored-ocel', 'data'),
-#     prevent_initial_call=True
-# )
-# def show_ocel_table(n_clicks, ocel_data):
-#     if not ocel_data:
-#         return html.P("No OCEL data available. Please run a simulation first.") 
-#     ocel_df = pd.read_json(ocel_data, orient='split')
-#     return dash_table.DataTable(
-#         id='ocel-table',
-#         data= ocel_df.to_dict('records'),
-#         columns=[{"name": i, "id": i} for i in ocel_df.columns],
-#         page_size=20,
-#         filter_action="native",
-#         sort_action="native",
-#         style_table={'overflowX': 'auto'},
-#         style_cell={
-#             'textAlign': 'left',
-#             'minWidth': '100px',
-#             'width': '150px',
-#             'maxWidth': '300px'
-#         }
-#     )
-
 from dash import callback, Output, Input, State, html, dcc, dash_table
 import pandas as pd
 import pm4py
 import plotly.express as px
+from collections import Counter
+import dash_bootstrap_components as dbc
+
+def ocel_summary_table(ocel):
+    """
+    Builds a dbc.Table with the same information from pm4py OCEL.get_summary(),
+    but in structured format.
+    """
+    # Compute summary stats
+    num_events = len(ocel.events)
+    num_objects = len(ocel.objects)
+    num_activities = ocel.events[ocel.event_activity].nunique()
+    num_object_types = ocel.objects[ocel.object_type_column].nunique()
+    num_event_object_rels = len(ocel.relations)
+
+    activities_occ = Counter(ocel.events[ocel.event_activity].value_counts().to_dict())
+    object_types_occ = Counter(ocel.objects[ocel.object_type_column].value_counts().to_dict())
+    unique_acts_per_obj_type = Counter(
+        ocel.relations.groupby(ocel.object_type_column)[ocel.event_activity].nunique().to_dict()
+    )
+
+    # General stats table
+    general_rows = [
+        ("Number of events", num_events),
+        ("Number of objects", num_objects),
+        ("Number of activities", num_activities),
+        ("Number of object types", num_object_types),
+        ("Events-objects relationships", num_event_object_rels),
+    ]
+    general_table = dbc.Table(
+        [html.Thead(html.Tr([html.Th("Metric"), html.Th("Value")]))] +
+        [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in general_rows])],
+        bordered=True, striped=True, hover=True, size="sm"
+    )
+
+    # Activities occurrences table
+    activities_table = dbc.Table(
+        [html.Thead(html.Tr([html.Th("Activity"), html.Th("Occurrences")]))] +
+        [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in activities_occ.items()])],
+        bordered=True, striped=True, hover=True, size="sm"
+    )
+
+    # Object types occurrences table
+    object_types_table = dbc.Table(
+        [html.Thead(html.Tr([html.Th("Object Type"), html.Th("Count")]))] +
+        [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in object_types_occ.items()])],
+        bordered=True, striped=True, hover=True, size="sm"
+    )
+
+    # Unique activities per object type table
+    unique_acts_table = dbc.Table(
+        [html.Thead(html.Tr([html.Th("Object Type"), html.Th("Unique Activities")]))] +
+        [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in unique_acts_per_obj_type.items()])],
+        bordered=True, striped=True, hover=True, size="sm"
+    )
+
+    # Wrap in cards for nicer layout
+    return html.Div([
+        dbc.Card(dbc.CardBody([html.H5("General Summary"), general_table]), className="mb-3"),
+        dbc.Card(dbc.CardBody([html.H5("Activities Occurrences"), activities_table]), className="mb-3"),
+        dbc.Card(dbc.CardBody([html.H5("Object Types Occurrences"), object_types_table]), className="mb-3"),
+        dbc.Card(dbc.CardBody([html.H5("Unique Activities per Object Type"), unique_acts_table]), className="mb-3"),
+    ])
+
 
 @callback(
     Output('ocel-table-container', 'children'),
     Output('ocel-stats-container', 'children'),
-    Output('pm-variant-plot', 'children'),
     Input('show-ocel-button', 'n_clicks'),
     State('stored-ocel', 'data'),
     prevent_initial_call=True
@@ -61,39 +93,8 @@ def analyze_ocel(n_clicks, ocel_json):
         style_cell={'textAlign': 'left', 'minWidth': '100px', 'width': '150px', 'maxWidth': '300px'}
     )
     
-    # Compute basic stats
-    num_events = len(ocel_df)
-    obj_types = ocel_df['ocel:type'].unique() if 'ocel:type' in ocel_df.columns else []
-    num_obj_types = len(obj_types)
+    ocel = pm4py.read_ocel2_json("OCEL.json")
+    ocel_summary_component = ocel_summary_table(ocel)
     
-    # Assuming columns like 'ocel:timestamp' and 'ocel:type' exist; adapt if needed
-    time_min = ocel_df['ocel:timestamp'].min() if 'ocel:timestamp' in ocel_df.columns else 'N/A'
-    time_max = ocel_df['ocel:timestamp'].max() if 'ocel:timestamp' in ocel_df.columns else 'N/A'
     
-    stats = html.Div([
-        html.H5("OCEL Summary Statistics"),
-        html.P(f"Number of events: {num_events}"),
-        html.P(f"Number of distinct object types: {num_obj_types}"),
-        html.P(f"Object types: {', '.join(obj_types)}"),
-        html.P(f"Event time range: {time_min} to {time_max}")
-    ])
-    
-    # Use pm4py to get variants dataframe for process mining plot
-    try:
-        # convert ocel_df back to OCEL object for pm4py (you may need to read from json)
-        # if you have a pm4py OCEL object you can do:
-        ocel_obj = pm4py.read_ocel2_json("OCEL.json")  # or adapt if stored differently
-        
-        variants_df = pm4py.get_variants_ocel(ocel_obj)
-        # Simple bar chart of top variants by frequency
-        fig = px.bar(
-            variants_df,
-            x='variant',
-            y='count',
-            title="Process Variants Frequencies"
-        )
-        plot = dcc.Graph(figure=fig)
-    except Exception as e:
-        plot = html.P(f"Could not generate variant plot: {e}")
-    
-    return table, stats, plot
+    return table, ocel_summary_component

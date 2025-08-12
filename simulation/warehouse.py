@@ -36,7 +36,7 @@ class Warehouse_SKU:
             self.order_sizes.append(self.eoq)
             
             self.inventory_in_transit = self.eoq
-            return self.eoq
+            return (self.eoq,self.delivery_func)
         else:
             return False
     

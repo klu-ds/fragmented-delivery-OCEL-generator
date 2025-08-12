@@ -16,6 +16,5 @@ layout = dbc.Container([
     html.Hr(),
     html.Div(id="ocel-table-container"),
     html.Div(id="ocel-stats-container"),
-    html.Div(id="pm-variant-plot"),
     dcc.Store(id="stored-ocel", storage_type="session")
 ])

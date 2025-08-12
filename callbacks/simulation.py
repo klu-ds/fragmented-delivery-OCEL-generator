@@ -217,18 +217,21 @@ def run_simulation(n_clicks, sku_configs, start_date, days, seed, mean_demand, s
 
     simulation = Simulation( config=sim_config)
     simulation.run()
-    simulation.evaluate_globally(report=True)
+    global_results = simulation.evaluate_globally(report=True)
+    global_table = results_table(global_results, "Global Simulation Results")
+    sku_tables = []
     for sku in warehouse.SKUs.keys():
-        simulation.evaluate_skus(sku, report=True)
+        sku_results = simulation.evaluate_skus(sku, report=True)
+        sku_tables.append(results_table(sku_results, f"SKU {sku} Results"))    
 
-    return (
-        html.Div([
-            html.H5("Simulation Completed"),
-            html.P(f"service level: {simulation.results['service_level']:.2f}"),
-            #html.P(f"Item Completion: {kpis['item_completion']:.2f}"),
-        ]),
-        get_ocel(f'{output_label}/')
-    )
+    children_layout = html.Div([
+        html.H4("Simulation Completed", className="mb-4"),
+        global_table,
+        html.Hr(),
+        html.Div(sku_tables)
+    ])
+
+    return children_layout, get_ocel(f'{output_label}/')
 
 def get_ocel(path):
     complete_ocel_json = {}
@@ -270,3 +273,20 @@ def get_ocel(path):
         ocel[col] = ocel[col].apply(serialize_cell)
 
     return ocel.to_json(date_format='iso', orient='split')
+
+def results_table(data_dict, title):
+        table_header = [html.Thead(html.Tr([html.Th("Metric"), html.Th("Value")]))]
+        rows = []
+        for key, value in data_dict.items():
+            if isinstance(value, float):
+                value = f"{value:.2f}"
+                print(key)
+            rows.append(html.Tr([html.Td(str(key).replace('_', ' ').title()), html.Td(value)]))
+        table_body = [html.Tbody(rows)]
+        return dbc.Card(
+            dbc.CardBody([
+                html.H5(title, className="card-title"),
+                dbc.Table(table_header + table_body, bordered=True, striped=True, hover=True, size="sm")
+            ]),
+            className="mb-3"
+        )
