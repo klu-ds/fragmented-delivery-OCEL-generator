@@ -32,27 +32,6 @@ layout = dbc.Container([
             dbc.Input(id='seed', type='number', value=1)
         ]),
     ], className="mb-3"),
-
-    dbc.Row([
-        dbc.Col([
-            dbc.Label("Mean Daily Demand"),
-            dbc.Input(id='mean-demand', type='number', value=50)
-        ]),
-        dbc.Col([
-            dbc.Label("Std Daily Demand"),
-            dbc.Input(id='std-demand', type='number', value=1)
-        ]),
-    ], className="mb-3"),
-    dbc.Row([
-        dbc.Col([
-            dbc.Label("Mean amount of splits"),
-            dbc.Input(id='mean-split', type='number', value=0)
-        ]),
-        dbc.Col([
-            dbc.Label("Std split"),
-            dbc.Input(id='std-split', type='number', value=1)
-        ])
-    ], className="mb-3"),
     dbc.Row([
         dbc.Col([
             dbc.Label("Output Label"),

@@ -48,7 +48,7 @@ class Simulation:
             print(f"generate order {order.id} with quantity {order.quantity}")
         ocel_config = {}
         for sku_id, sku in order.SKUs.items():
-            delivery_days = max(1, int(np.random.normal(self.delivery_split_centre, self.delivery_split_std)))
+            delivery_days = max(1, int(np.random.normal(sku.delivery_split_centre, sku.delivery_split_std)))
             ocel_config[sku_id] = {'amount': sku.quantity, 'del_days': delivery_days, 'func':  sku.delivery_func}
         generate_ocel_event_log(start_date=self.current_date, items=ocel_config, iteration=order.id, output=self.output)
         
@@ -81,8 +81,8 @@ class Simulation:
 
     def simulate_demand(self):
         demands = {}
-        for sku in self.warehouse.SKUs.keys():
-            demands[sku] = max(0, int(np.random.normal(self.mean_daily_demand, self.std_daily_demand))) 
+        for sku_id,sku in self.warehouse.SKUs.items():
+            demands[sku_id] = max(0, int(np.random.normal(sku.mean_daily_demand, sku.std_daily_demand))) 
         demand_today = sum(demands.values())
         fulfilled_demand_today, backorders_today = self.warehouse.consume_inventory(self.current_date, demands)
         

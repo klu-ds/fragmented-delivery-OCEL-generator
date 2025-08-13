@@ -6,6 +6,7 @@ import json
 import pm4py
 from simulation.warehouse import Warehouse
 from simulation.simulation import Simulation
+import numpy as np
 
 delivery_functions = {
     'constant': lambda x: 1,
@@ -20,7 +21,12 @@ from dash.exceptions import PreventUpdate
     Input({"type": "sku-rop", "index": ALL}, "value"),
     Input({"type": "sku-eoq", "index": ALL}, "value"),
     Input({"type": "sku-order-cost", "index": ALL}, "value"),
+    Input({"type": "sku-holding-cost", "index": ALL}, "value"),
     Input({"type": "sku-inventory", "index": ALL}, "value"),
+    Input({"type": "sku-mean-demand", "index": ALL}, "value"),
+    Input({"type": "sku-std-demand", "index": ALL}, "value"),
+    Input({"type": "sku-mean-split", "index": ALL}, "value"),
+    Input({"type": "sku-std-split", "index": ALL}, "value"),
     Input({"type": "sku-delivery-func", "index": ALL}, "value"),
     State("stored-sku-configs", "data"),
     prevent_initial_call=True
@@ -31,7 +37,12 @@ def manage_skus(
     rop_values,
     eoq_values,
     order_cost_values,
+    holding_cost_values,
     inventory_values,
+    mean_demand_values,
+    std_demand_values,
+    mean_split_values,
+    std_split_values,
     delivery_func_values,
     sku_list
 ):
@@ -51,6 +62,10 @@ def manage_skus(
             "order_base_cost": 50,
             "holding_cost": 1,
             "inventory": 500,
+            'mean_daily_demand' : 50,
+            'std_daily_demand' : 1,
+            'delivery_split_centre' : 0,
+            'delivery_split_std' : 0,
             "delivery_func": "constant",
             "kpi": "order_completion",
             "verbose": True
@@ -72,8 +87,18 @@ def manage_skus(
                 sku['eoq'] = eoq_values[i]
             if i < len(order_cost_values):
                 sku['order_base_cost'] = order_cost_values[i]
+            if i < len(holding_cost_values):
+                sku['holding_cost'] = holding_cost_values[i]
             if i < len(inventory_values):
                 sku['inventory'] = inventory_values[i]
+            if i < len(mean_demand_values):
+                sku['mean_daily_demand'] = mean_demand_values[i]
+            if i < len(std_demand_values):
+                sku['std_daily_demand'] = std_demand_values[i]
+            if i < len(mean_split_values):
+                sku['delivery_split_centre'] = mean_split_values[i]
+            if i < len(std_split_values):
+                sku['delivery_split_std'] = std_split_values[i]
             if i < len(delivery_func_values):
                 sku['delivery_func'] = delivery_func_values[i]
         for sku in sku_list:
@@ -139,11 +164,56 @@ def render_sku_card(sku):
                     )
                 ], width=2),
                 dbc.Col([
+                    dbc.Label("Holding Cost"),
+                    dbc.Input(
+                        id={"type": "sku-holding-cost", "index": sku["id"]},
+                        type="number",
+                        value=sku["holding_cost"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
                     dbc.Label("Inventory"),
                     dbc.Input(
                         id={"type": "sku-inventory", "index": sku["id"]},
                         type="number",
                         value=sku["inventory"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Mean Daily Demand"),
+                    dbc.Input(
+                        id={"type": "sku-mean-demand", "index": sku["id"]},
+                        type="number",
+                        value=sku["mean_daily_demand"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Std Daily Demand"),
+                    dbc.Input(
+                        id={"type": "sku-std-demand", "index": sku["id"]},
+                        type="number",
+                        value=sku["std_daily_demand"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Mean Splits"),
+                    dbc.Input(
+                        id={"type": "sku-mean-split", "index": sku["id"]},
+                        type="number",
+                        value=sku["delivery_split_centre"],
+                        min=0
+                    )
+                ], width=2),
+                dbc.Col([
+                    dbc.Label("Std Splits"),
+                    dbc.Input(
+                        id={"type": "sku-std-split", "index": sku["id"]},
+                        type="number",
+                        value=sku["delivery_split_std"],
                         min=0
                     )
                 ], width=2),
@@ -158,7 +228,7 @@ def render_sku_card(sku):
                         ],
                         value=sku["delivery_func"]
                     )
-                ], width=4)
+                ], width=2)
             ], className="g-2 mt-2")
         ]),
         className="mb-3 shadow-sm"
@@ -172,14 +242,10 @@ def render_sku_card(sku):
     State('start-date', 'date'),
     State('sim-days', 'value'),
     State('seed', 'value'),
-    State('mean-demand', 'value'),
-    State('std-demand', 'value'),
-    State('mean-split', 'value'),
-    State('std-split', 'value'),
     State('output-label', 'value'),
     prevent_initial_call=True
 )
-def run_simulation(n_clicks, sku_configs, start_date, days, seed, mean_demand, std_demand, mean_split, std_split, output_label):
+def run_simulation(n_clicks, sku_configs, start_date, days, seed, output_label):
     if not n_clicks:
         return ""
 
@@ -207,10 +273,6 @@ def run_simulation(n_clicks, sku_configs, start_date, days, seed, mean_demand, s
         'start_date': datetime.fromisoformat(start_date),
         'days': days,
         'seed': seed,
-        'mean_daily_demand': mean_demand,
-        'std_daily_demand': std_demand,
-        'delivery_split_centre': mean_split,
-        'delivery_split_std': std_split,
         'output': output_label
     }
 
