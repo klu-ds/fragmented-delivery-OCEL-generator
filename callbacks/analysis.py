@@ -4,6 +4,7 @@ import pm4py
 import plotly.express as px
 from collections import Counter
 import dash_bootstrap_components as dbc
+import json
 
 def ocel_summary_table(ocel):
     """
@@ -98,3 +99,19 @@ def analyze_ocel(n_clicks, ocel_json):
     
     
     return table, ocel_summary_component
+
+@callback(
+    Output("download-ocel", "data"),
+    Input("download-ocel-btn", "n_clicks"),
+    prevent_initial_call=True
+)
+def download_ocel(n_clicks):
+    # Load your OCEL (replace with your actual OCEL object in memory if available)
+    with open('OCEL.json', 'r') as file:
+        ocel = json.load(file)
+    ocel_json = json.dumps(ocel)
+    # Return as downloadable file
+    return dcc.send_string(
+        ocel_json,
+        filename="OCEL.json"
+    )
