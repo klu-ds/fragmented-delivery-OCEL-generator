@@ -113,7 +113,7 @@ def manage_skus(
 )
 def render_sku_inputs(sku_list):
     if not sku_list:
-        return html.Div("No SKUs configured yet.")
+        return html.Div("No items configured yet.")
     return [render_sku_card(sku) for sku in sku_list]
 
 def render_sku_card(sku):
@@ -121,7 +121,7 @@ def render_sku_card(sku):
         dbc.CardBody([
             # Card header row with title and delete button
             dbc.Row([
-                dbc.Col(html.H6(f"SKU {sku['id']}", className="card-title"), width=10),
+                dbc.Col(html.H6(f"Item {sku['id']}", className="card-title"), width=10),
                 dbc.Col(
                     dbc.Button(
                         "×",
@@ -258,7 +258,7 @@ def run_simulation(n_clicks, sku_configs, start_date, days, seed, output_label):
     os.makedirs(output_label)
    
     if not sku_configs:
-        return html.P("No SKU configs provided."), None
+        return html.P("No item configs provided."), None
 
     # Map string delivery funcs to actual lambdas
     for sku in sku_configs:
@@ -284,7 +284,7 @@ def run_simulation(n_clicks, sku_configs, start_date, days, seed, output_label):
     sku_tables = []
     for sku in warehouse.SKUs.keys():
         sku_results = simulation.evaluate_skus(sku, report=True)
-        sku_tables.append(results_table(sku_results, f"SKU {sku} Results"))    
+        sku_tables.append(results_table(sku_results, f"Item {sku} Results"))    
 
     children_layout = html.Div([
         html.H4("Simulation Completed", className="mb-4"),

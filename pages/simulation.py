@@ -25,7 +25,7 @@ layout = dbc.Container([
         ]),
         dbc.Col([
             dbc.Label("Simulation Days"), 
-            dbc.Input(id='sim-days', type='number', value=1750)
+            dbc.Input(id='sim-days', type='number', value=1000)
         ]),
         dbc.Col([
             dbc.Label("Random Seed"),
@@ -41,9 +41,9 @@ layout = dbc.Container([
 
     dcc.Store(id="stored-sku-configs", data=[], storage_type="session"),
 
-    html.H4("Configure SKUs"),
-    html.Div(id="sku-config-container"),  # where dynamic inputs will appear
-    dbc.Button("Add SKU", id="add-sku-button", color="primary", className="mb-2"),
+    html.H4("Configure Items"),
+    html.Div(id="sku-config-container"),  
+    dbc.Button("Add Item", id="add-sku-button", color="primary", className="mb-2"),
 
      html.Hr(),
     
