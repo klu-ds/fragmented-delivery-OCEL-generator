@@ -1,50 +1,88 @@
-from dash import callback,dcc, html, Input, Output, State
+from dash import callback, dcc, html, Input, Output, State, DiskcacheManager, CeleryManager, Dash
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
+import time
+import os
 
 from simulation.benchmark import run_grid, summarize, FixedParams
 
+def parse_input(value):
+    """Convert a Dash Input value to a list of ints."""
+    if isinstance(value, str):
+        return [int(x.strip()) for x in value.split(",") if x.strip()]
+    elif isinstance(value, int):
+        return [value]
+    elif isinstance(value, list):
+        return [int(x) for x in value]
+    return []
+
+def parse_single_int(value, default=1):
+    """Safely parse a single integer input from Dash."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
 @callback(
-    Output("benchmark-summary", "children"),
-    Output("benchmark-plot", "figure"),
-    Output("benchmark-raw", "data"),
     Input("run-benchmark", "n_clicks"),
-    State("bm-days", "value"),
-    State("bm-skus", "value"),
-    State("bm-splits", "value"),
-    State("bm-repeats", "value"),
+    State("benchmark-days", "value"),
+    State("benchmark-skus", "value"),
+    State("benchmark-splits", "value"),
+    State("benchmark-repeats", "value"),
+    output=Output("benchmark-results", "children"),
+    background=True,
+    running=[
+        (Output("run-benchmark", "disabled"), True, False),
+        (Output("cancel-benchmark", "disabled"), False, True),
+        (
+            Output("benchmark-results", "style"),
+            {"visibility": "hidden"},
+            {"visibility": "visible"},
+        ),
+        (
+            Output("progress-bar", "style"),
+            {"visibility": "visible"},
+            {"visibility": "hidden"},
+        ),
+    ],
+    cancel=Input("cancel-benchmark", "n_clicks"),
+    progress=[Output("progress-bar", "value"), Output("progress-bar", "max")],
     prevent_initial_call=True
 )
-
-def run_benchmark(n_clicks, days_val, skus_val, splits_val, repeats):
-    # parse comma-separated values
-    days_list = [int(x.strip()) for x in days_val.split(",") if x.strip()]
-    skus_list = [int(x.strip()) for x in skus_val.split(",") if x.strip()]
-    split_list = [float(x.strip()) for x in splits_val.split(",") if x.strip()]
+def run_benchmark(set_progress,n_clicks, days_val, skus_val, splits_val, repeats_val):
+    days_list = parse_input(days_val)
+    skus_list = parse_input(skus_val)
+    splits_list = parse_input(splits_val)
+    repeats = parse_single_int(repeats_val, default=1)
 
     fixed = FixedParams(seed=1, delivery_func_name="constant", verbose=False, write_output=False)
+    print(set_progress)
+    results = run_grid(days_list, skus_list, splits_list, repeats, fixed, on_progress=set_progress)
 
-    df = run_grid(days_list, skus_list, split_list, repeats, fixed)
-    summary = summarize(df)
+    summary = summarize(results)
 
-    # summary table
     table = dbc.Table.from_dataframe(summary.round(3), striped=True, bordered=True, hover=True, size="sm")
 
-    # plot runtime scaling
     fig = px.line(
-        summary,
-        x="days", y="mean",
-        color="n_skus",
-        line_dash="split_centre",
-        markers=True,
-        title="Benchmark Runtime Scaling",
-        labels={"mean": "Runtime (s)", "days": "Simulation Days", "n_skus": "# SKUs", "split_centre": "Split Centre"}
-    )
+            summary,
+            x="days",
+            y="mean",
+            color="n_skus",
+            line_dash="split_centre",
+            markers=True,
+            title="Benchmark Runtime Scaling",
+            labels={"mean": "Runtime (s)", "days": "Simulation Days", "n_skus": "# SKUs", "split_centre": "Split Centre"}
+        )
+    
+    output_div = html.Div([
+        html.H5("Benchmark Summary"),
+        table,
+        html.Hr(),
+        dcc.Graph(id="benchmark-graph", figure=fig)
+    ])
 
-    # store raw df in JSON for download
-    return table, fig, df.to_json(date_format="iso", orient="split")
-
+    return output_div
 
 @callback(
     Output("download-benchmark", "data"),

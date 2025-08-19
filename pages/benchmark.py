@@ -10,32 +10,35 @@ register_page(__name__, path="/benchmark", name="Benchmark")
 layout = dbc.Container([
     html.H2("Scalability Benchmark", className="mb-4"),
 
-    # Controls
     dbc.Row([
         dbc.Col([
-            dbc.Label("Simulation Days"),
-            dcc.Input(id="bm-days", type="text", value="250,500,1000,2000", className="form-control"),
-        ], md=3),
-
+            dbc.Label("Days range (comma-separated)"),
+            dbc.Input(id="benchmark-days", type="text", value="100,200,300"),
+        ], md=4),
         dbc.Col([
-            dbc.Label("Number of SKUs"),
-            dcc.Input(id="bm-skus", type="text", value="1,5,10,20", className="form-control"),
-        ], md=3),
-
+            dbc.Label("SKUs range (comma-separated)"),
+            dbc.Input(id="benchmark-skus", type="text", value="10,20,30"),
+        ], md=4),
         dbc.Col([
-            dbc.Label("Split Centres"),
-            dcc.Input(id="bm-splits", type="text", value="0,1,2,5", className="form-control"),
-        ], md=3),
+            dbc.Label("Splits range (comma-separated)"),
+            dbc.Input(id="benchmark-splits", type="text", value="1,2,3"),
+        ], md=4),
+    ], className="mb-3"),
 
+    dbc.Row([
         dbc.Col([
-            dbc.Label("Repeats"),
-            dcc.Input(id="bm-repeats", type="number", value=3, min=1, className="form-control"),
-        ], md=3),
+            dbc.Label("Repeats per config"),
+            dbc.Input(id="benchmark-repeats", type="number", value=2),
+        ], md=4),
     ], className="mb-3"),
 
     dbc.Button("Run Benchmark", id="run-benchmark", color="primary", className="mb-3"),
-
-    # Hidden storage for raw benchmark data
+    dbc.Button("Cancel Benchmark", id="cancel-benchmark", color="primary", className="mb-3"),
+    
+    dbc.Row([dbc.Col([
+        dbc.Progress(id='progress-bar', style={'margin-top': 15})
+    ], width=2)]),
+# Hidden storage for raw benchmark data
     dcc.Store(id="benchmark-raw"),
 
     # Download component
@@ -43,8 +46,5 @@ layout = dbc.Container([
 
     dbc.Button("Download Results as CSV", id="download-btn", color="secondary", className="mb-3"),
 
-    dbc.Spinner(children=[
-        html.Div(id="benchmark-summary"),
-        dcc.Graph(id="benchmark-plot")
-    ])
+    html.Div(id="benchmark-results")
 ], fluid=True)

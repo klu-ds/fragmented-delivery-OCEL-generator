@@ -99,8 +99,10 @@ def run_once(days: int, n_skus: int, split_centre: float, fixed: FixedParams) ->
     }
 
 def run_grid(days_list: Iterable[int], skus_list: Iterable[int], split_list: Iterable[float],
-             repeats: int, fixed: FixedParams) -> pd.DataFrame:
+             repeats: int, fixed: FixedParams, on_progress=None) -> pd.DataFrame:
     rows = []
+    total_runs = len(days_list) * len(skus_list) * len(split_list) * repeats
+    run_count = 0
     _ = run_once(days_list[0], skus_list[0], split_list[0], fixed)  # warmup
 
     for days, n_skus, split_centre in itertools.product(days_list, skus_list, split_list):
@@ -110,8 +112,14 @@ def run_grid(days_list: Iterable[int], skus_list: Iterable[int], split_list: Ite
             res["repeat"] = r
             rows.append(res)
             reps.append(res["runtime_s"])
+            run_count += 1
+
+            if on_progress is not None:
+                on_progress((str(run_count), str(total_runs)))
         print(f"[{days}d, {n_skus} SKUs, split={split_centre}] "
               f"-> {st.mean(reps):.3f}s avg over {repeats} runs")
+        
+    
     return pd.DataFrame(rows)
 
 def summarize(df: pd.DataFrame) -> pd.DataFrame:
