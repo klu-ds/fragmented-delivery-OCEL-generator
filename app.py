@@ -17,6 +17,7 @@ app.layout = dbc.Container([
         [
             dbc.NavLink("Simulation", href="/", active="exact"),
             dbc.NavLink("Analysis", href="/analysis", active="exact"),
+            dbc.NavLink("Benchmark",href="/benchmark", active="exact" )
         ],
         pills=True
     ),

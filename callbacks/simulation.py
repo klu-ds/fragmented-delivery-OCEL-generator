@@ -1,6 +1,7 @@
 from dash import Input, Output, State, callback, html,  MATCH, ALL, ctx, callback_context
-from datetime import datetime
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
+from datetime import datetime
 import os, shutil
 import json
 import pm4py
@@ -13,7 +14,6 @@ delivery_functions = {
     'quadratic': lambda x: x**2,
     'logarithmic': lambda x: -np.log(x)
 }
-from dash.exceptions import PreventUpdate
 @callback(
     Output("stored-sku-configs", "data"),
     Input("add-sku-button", "n_clicks"),

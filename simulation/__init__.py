@@ -2,3 +2,4 @@
 
 from . import simulation
 from . import warehouse
+from . import benchmark

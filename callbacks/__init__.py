@@ -2,3 +2,4 @@
 
 from . import simulation
 from . import analysis
+from . import benchmark
