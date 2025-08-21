@@ -106,7 +106,6 @@ def analyze_ocel(n_clicks, ocel_json):
     prevent_initial_call=True
 )
 def download_ocel(n_clicks):
-    # Load your OCEL (replace with your actual OCEL object in memory if available)
     with open('OCEL.json', 'r') as file:
         ocel = json.load(file)
     ocel_json = json.dumps(ocel)

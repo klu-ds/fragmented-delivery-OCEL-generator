@@ -1,4 +1,4 @@
-from dash import callback, dcc, html, Input, Output, State, DiskcacheManager, CeleryManager, Dash
+from dash import callback, dcc, html, Input, Output, State, DiskcacheManager, CeleryManager, Dash, no_update
 import dash_bootstrap_components as dbc
 import plotly.express as px
 import pandas as pd
@@ -25,12 +25,13 @@ def parse_single_int(value, default=1):
         return default
 
 @callback(
+    Output("benchmark-results", "children"),
+    Output("benchmark-raw", "data"), 
     Input("run-benchmark", "n_clicks"),
     State("benchmark-days", "value"),
     State("benchmark-skus", "value"),
     State("benchmark-splits", "value"),
     State("benchmark-repeats", "value"),
-    output=Output("benchmark-results", "children"),
     background=True,
     running=[
         (Output("run-benchmark", "disabled"), True, False),
@@ -75,14 +76,33 @@ def run_benchmark(set_progress,n_clicks, days_val, skus_val, splits_val, repeats
             labels={"mean": "Runtime (s)", "days": "Simulation Days", "n_skus": "# SKUs", "split_centre": "Split Centre"}
         )
     
+    # Plot 1: Days vs Runtime
+    fig_days = px.line(summary, x="days", y="mean", color="n_skus", line_group="split_centre",
+                       markers=True, title="Runtime vs Days")
+
+    # Plot 2: SKUs vs Runtime
+    fig_skus = px.line(summary, x="n_skus", y="mean", color="days", line_group="split_centre",
+                       markers=True, title="Runtime vs SKUs")
+
+    # Plot 3: Splits vs Runtime
+    fig_splits = px.line(summary, x="split_centre", y="mean", color="days", line_group="n_skus",
+                         markers=True, title="Runtime vs Splits")
+
+    plots = html.Div([
+        dcc.Graph(id="benchmark-graph", figure=fig),
+        dcc.Graph(id="days-graph", figure=fig_days),
+        dcc.Graph(id="sku-graph", figure=fig_skus),
+        dcc.Graph(id="splits-graph", figure=fig_splits),
+    ])
+
     output_div = html.Div([
         html.H5("Benchmark Summary"),
         table,
         html.Hr(),
-        dcc.Graph(id="benchmark-graph", figure=fig)
+        plots
     ])
 
-    return output_div
+    return output_div, results.to_json(date_format="iso", orient="split")
 
 @callback(
     Output("download-benchmark", "data"),
@@ -92,7 +112,8 @@ def run_benchmark(set_progress,n_clicks, days_val, skus_val, splits_val, repeats
 )
 def download_benchmark(n_clicks, raw_json):
     if raw_json is None:
-        return dash.no_update
+        print("no data")
+        return no_update
 
     df = pd.read_json(raw_json, orient="split")
     return dcc.send_data_frame(df.to_csv, "benchmark_results.csv")

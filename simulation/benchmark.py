@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Iterable
 import numpy as np
 import pandas as pd
+import json
 
 from .warehouse import Warehouse
 from .simulation import Simulation
@@ -20,8 +21,9 @@ class FixedParams:
     delivery_func_name: str = "constant"
     split_std: float = 1.0
     verbose: bool = False
+    build_ocel: bool = True
     write_output: bool = False
-    mean_daily_demand: float = 50.0   # <- fixed demand across runs
+    mean_daily_demand: float = 50.0   
     std_daily_demand: float = 1.0
 
 def make_sku_configs(
@@ -46,13 +48,36 @@ def make_sku_configs(
             "delivery_func": fn,
             "kpi": "order_completion",
             "verbose": False,
-            # per-SKU demand + split
             "mean_daily_demand": mean_demand,
             "std_daily_demand": std_demand,
             "delivery_split_centre": split_centre,
             "delivery_split_std": split_std,
         })
     return configs
+
+def build_ocel(path):
+    complete_ocel_json = {}
+    complete_ocel_json["objects"] = []
+    complete_ocel_json["events"] =[]
+    o_count = 0
+   
+    json_files = [pos_json for pos_json in os.listdir(path) if pos_json.endswith('.json')]
+    with open(os.path.join(path,json_files[0])) as init_js:
+        json_text = json.load(init_js)
+        complete_ocel_json["objectTypes"]= json_text["objectTypes"]
+        complete_ocel_json["eventTypes"]= json_text["eventTypes"]
+
+    for index, js in enumerate(json_files):
+        with open(os.path.join(path, js)) as json_file:
+            json_ocel = json.load(json_file)
+            o_count += len(json_ocel["objects"])
+            complete_ocel_json["objects"] +=(json_ocel["objects"])
+            complete_ocel_json["events"]+=(json_ocel["events"])
+
+    json_object = json.dumps(complete_ocel_json)
+
+    with open(f"{path}/OCEL.json", "w") as outfile:
+        outfile.write(json_object)
 
 def run_once(days: int, n_skus: int, split_centre: float, fixed: FixedParams) -> Dict:
     wh = Warehouse(
@@ -66,17 +91,16 @@ def run_once(days: int, n_skus: int, split_centre: float, fixed: FixedParams) ->
         )
     )
 
-    out_dir = None
-    if fixed.write_output:
-        out_dir = f"bench_out_{uuid.uuid4().hex[:8]}"
-        os.makedirs(out_dir, exist_ok=True)
+
+    out_dir = f"bench_out_{uuid.uuid4().hex[:8]}"
+    os.makedirs(out_dir, exist_ok=True)
 
     sim_cfg = {
         "warehouse": wh,
         "start_date": pd.Timestamp.now().to_pydatetime(),
         "days": days,
         "seed": fixed.seed,
-        "output": out_dir if out_dir else "NO_OUTPUT"
+        "output": out_dir 
     }
 
     sim = Simulation(config=sim_cfg)
@@ -86,16 +110,18 @@ def run_once(days: int, n_skus: int, split_centre: float, fixed: FixedParams) ->
     sim.evaluate_globally(report=False)
     for sku in wh.SKUs.keys():
         sim.evaluate_skus(sku, report=False)
+    if fixed.build_ocel:
+        build_ocel(out_dir)
     t1 = time.perf_counter()
 
-    if out_dir and os.path.isdir(out_dir):
+    if not fixed.write_output and os.path.isdir(out_dir):
         shutil.rmtree(out_dir, ignore_errors=True)
 
     return {
         "days": days,
         "n_skus": n_skus,
         "split_centre": split_centre,
-        "runtime_s": t1 - t0
+        "run_time": t1 - t0
     }
 
 def run_grid(days_list: Iterable[int], skus_list: Iterable[int], split_list: Iterable[float],
@@ -111,7 +137,7 @@ def run_grid(days_list: Iterable[int], skus_list: Iterable[int], split_list: Ite
             res = run_once(days, n_skus, split_centre, fixed)
             res["repeat"] = r
             rows.append(res)
-            reps.append(res["runtime_s"])
+            reps.append(res["run_time"])
             run_count += 1
 
             if on_progress is not None:
@@ -124,7 +150,7 @@ def run_grid(days_list: Iterable[int], skus_list: Iterable[int], split_list: Ite
 
 def summarize(df: pd.DataFrame) -> pd.DataFrame:
     g = df.groupby(["days", "n_skus", "split_centre"])
-    out = g["runtime_s"].agg(["count", "mean", "std"]).reset_index()
+    out = g["run_time"].agg(["count", "mean", "std"]).reset_index()
     out["ci95"] = out.apply(
         lambda r: 1.96 * (r["std"] / (r["count"] ** 0.5)) if r["count"] > 1 and r["std"] == r["std"] else 0.0,
         axis=1

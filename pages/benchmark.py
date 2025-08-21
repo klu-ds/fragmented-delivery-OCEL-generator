@@ -13,22 +13,22 @@ layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dbc.Label("Days range (comma-separated)"),
-            dbc.Input(id="benchmark-days", type="text", value="100,200,300"),
+            dbc.Input(id="benchmark-days", type="text", value="100,500,1000,2000,5000"),
         ], md=4),
         dbc.Col([
             dbc.Label("SKUs range (comma-separated)"),
-            dbc.Input(id="benchmark-skus", type="text", value="10,20,30"),
+            dbc.Input(id="benchmark-skus", type="text", value="1,5,10,20,50"),
         ], md=4),
         dbc.Col([
             dbc.Label("Splits range (comma-separated)"),
-            dbc.Input(id="benchmark-splits", type="text", value="1,2,3"),
+            dbc.Input(id="benchmark-splits", type="text", value="0,1,2,5,10"),
         ], md=4),
     ], className="mb-3"),
 
     dbc.Row([
         dbc.Col([
             dbc.Label("Repeats per config"),
-            dbc.Input(id="benchmark-repeats", type="number", value=2),
+            dbc.Input(id="benchmark-repeats", type="number", value=3),
         ], md=4),
     ], className="mb-3"),
 
@@ -38,10 +38,9 @@ layout = dbc.Container([
     dbc.Row([dbc.Col([
         dbc.Progress(id='progress-bar', style={'margin-top': 15})
     ], width=2)]),
-# Hidden storage for raw benchmark data
+
     dcc.Store(id="benchmark-raw"),
 
-    # Download component
     dcc.Download(id="download-benchmark"),
 
     dbc.Button("Download Results as CSV", id="download-btn", color="secondary", className="mb-3"),
