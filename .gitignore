@@ -16,3 +16,5 @@ OrderProcess*
 */__pycache__/*
 cache*
 *csv
+*png
+plots.ipynb
