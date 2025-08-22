@@ -32,31 +32,38 @@ def ocel_summary_table(ocel):
         ("Number of object types", num_object_types),
         ("Events-objects relationships", num_event_object_rels),
     ]
+
+    table_style = {"tableLayout": "fixed", "width": "100%"}
+
     general_table = dbc.Table(
         [html.Thead(html.Tr([html.Th("Metric"), html.Th("Value")]))] +
         [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in general_rows])],
-        bordered=True, striped=True, hover=True, size="sm"
+        bordered=True, striped=True, hover=True, size="sm",
+        style=table_style
     )
 
     # Activities occurrences table
     activities_table = dbc.Table(
         [html.Thead(html.Tr([html.Th("Activity"), html.Th("Occurrences")]))] +
         [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in activities_occ.items()])],
-        bordered=True, striped=True, hover=True, size="sm"
+        bordered=True, striped=True, hover=True, size="sm",
+        style=table_style
     )
 
     # Object types occurrences table
     object_types_table = dbc.Table(
         [html.Thead(html.Tr([html.Th("Object Type"), html.Th("Count")]))] +
         [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in object_types_occ.items()])],
-        bordered=True, striped=True, hover=True, size="sm"
+        bordered=True, striped=True, hover=True, size="sm",
+        style=table_style
     )
 
     # Unique activities per object type table
     unique_acts_table = dbc.Table(
         [html.Thead(html.Tr([html.Th("Object Type"), html.Th("Unique Activities")]))] +
         [html.Tbody([html.Tr([html.Td(k), html.Td(v)]) for k, v in unique_acts_per_obj_type.items()])],
-        bordered=True, striped=True, hover=True, size="sm"
+        bordered=True, striped=True, hover=True, size="sm",
+        style=table_style
     )
 
     # Wrap in cards for nicer layout
